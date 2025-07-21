@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TaskTamer - Adaptive To-Do Lists</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --urgent: #ff4141;
+            --soon: #FFA500;
+            --later: #66bb6a;
+            --work: #4731D3;
+            --personal: #E4572E;
+            --errand: #17BEBB;
+            --bg: #f6f6f9;
+            --card: #fff;
+            --text: #1a1a1a;
+            --gray: #bdbdbd;
+        }
+        body {
+            background: var(--bg);
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            color: var(--text);
+        }
+        h1, h2 {
+            margin-top: 0;
+        }
+        .container {
+            max-width: 520px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .energy-selector {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .energy-btn {
+            border: none;
+            background: #eee;
+            border-radius: 16px;
+            padding: 4px 10px;
+            font-size: 0.9em;
+            margin: 0 2px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .energy-btn.selected {
+            background: #b4a7f5;
+            color: #3e0ca9;
+            font-weight: bold;
+        }
+        form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+            background: var(--card);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 2px 8px #0001;
+        }
+        form input, form select {
+            flex: 1 1 120px;
+            padding: 6px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            font-size: 1em;
+        }
+        form input[type="date"] {
+            max-width: 130px;
+        }
+        form button {
+            flex: 0 0 auto;
+            background: #4731D3;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 18px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .task-list {
+            margin-bottom: 30px;
+        }
+        .task-card {
+            background: var(--card);
+            border-radius: 11px;
+            box-shadow: 0 1px 5px #0001;
+            margin-bottom: 10px;
+            padding: 12px 10px 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            position: relative;
+            border-left: 6px solid var(--later);
+            transition: box-shadow 0.2s, border 0.2s;
+            user-select: none;
+        }
+        .task-card.urgent { border-left-color: var(--urgent);}
+        .task-card.soon { border-left-color: var(--soon);}
+        .task-card.later { border-left-color: var(--later);}
+        .task-card.dragging {
+            opacity: 0.5;
+            box-shadow: 0 4px 20px #4731D333;
+        }
+        .task-category {
+            font-size: 1.5em;
+            margin-right: 2px;
+        }
+        .task-main {
+            flex: 1;
+        }
+        .task-title {
+            font-weight: 600;
+            font-size: 1.08em;
+        }
+        .task-info {
+            font-size: 0.95em;
+            color: #555;
+            margin-top: 2px;
+        }
+        .task-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-left: 8px;
+        }
+        .task-actions button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.15em;
+            color: #888;
+            padding: 0;
+        }
+        .task-actions button:hover {
+            color: #4731D3;
+        }
+        .calendar-card {
+            background: var(--card);
+            border-radius: 10px;
+            box-shadow: 0 1px 6px #0001;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+        }
+        .calendar-event {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1em;
+            margin-bottom: 5px;
+        }
+        .calendar-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+            background: #4731D3;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 6px; }
+            form input, form select { font-size: 0.98em; }
+            .task-card { font-size: 0.98em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>TaskTamer</h1>
+            <span style="font-size:1.6em;">🦥</span>
+            <div class="energy-selector">
+                <span style="font-size:1.03em;">Energy:</span>
+                <button class="energy-btn selected" data-level="High">🔋 High</button>
+                <button class="energy-btn" data-level="Medium">🔆 Medium</button>
+                <button class="energy-btn" data-level="Low">😴 Low</button>
+            </div>
+        </div>
+        
+        <form id="taskForm">
+            <input type="text" id="taskTitle" placeholder="What needs doing?" required maxlength="60">
+            <select id="taskCategory" required>
+                <option value="" disabled selected>Category</option>
+                <option value="Work">💼 Work</option>
+                <option value="Personal">🏠 Personal</option>
+                <option value="Errand">🛒 Errand</option>
+                <option value="Other">⭐ Other</option>
+            </select>
+            <select id="taskImportance" required>
+                <option value="2">⭐️ Low</option>
+                <option value="3">⭐️⭐️ Med</option>
+                <option value="5">⭐️⭐️⭐️ High</option>
+            </select>
+            <input type="date" id="taskDeadline" required>
+            <select id="taskEnergy" required>
+                <option value="1">🔋 High</option>
+                <option value="2" selected>🔆 Medium</option>
+                <option value="3">😴 Low</option>
+            </select>
+            <button type="submit">Add</button>
+        </form>
+
+        <h2>Today's Tasks</h2>
+        <div class="task-list" id="taskList"></div>
+
+        <h2>Today's Calendar</h2>
+        <div class="calendar-card" id="calendarCard"></div>
+    </div>
+
+    <script>
+        // --- DATA ---
+        let tasks = [];
+        let editingTaskId = null;
+        let userEnergy = "High"; // default
+
+        // Mock calendar events for today
+        const today = new Date().toISOString().slice(0,10);
+        const calendarEvents = [
+            {time: "09:00", title: "Team Call"},
+            {time: "11:30", title: "Doctor Appt"},
+            {time: "16:00", title: "Project Deadline"},
+        ];
+
+        // --- CATEGORY ICONS ---
+        const categoryIcons = {
+            "Work": "💼",
+            "Personal": "🏠",
+            "Errand": "🛒",
+            "Other": "⭐"
+        };
+
+        // --- UTILS ---
+        function getUrgency(deadline) {
+            if (!deadline) return "later";
+            const now = new Date();
+            const end = new Date(deadline);
+            const ms = end - now;
+            if (ms < 0) return "urgent";
+            const hours = ms / 1000 / 60 / 60;
+            if (hours < 12) return "urgent";
+            if (hours < 36) return "soon";
+            return "later";
+        }
+        function getUrgencyLabel(urgency) {
+            if (urgency === "urgent") return "Urgent";
+            if (urgency === "soon") return "Soon";
+            return "Later";
+        }
+        function daysUntil(dateStr) {
+            const now = new Date();
+            const end = new Date(dateStr);
+            const diff = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+            return diff;
+        }
+        function energyToNum(energy) {
+            return parseInt(energy, 10);
+        }
+
+        // --- PRIORITIZATION ALGORITHM ---
+        /*
+            priority = 
+                + importance (2/3/5)
+                + urgency bonus (urgent: +4, soon: +2, later: 0)
+                - energy penalty if above user's current energy
+        */
+        function calcPriority(task) {
+            let p = Number(task.importance);
+            const urgency = getUrgency(task.deadline);
+            if (urgency === "urgent") p += 4;
+            else if (urgency === "soon") p += 2;
+            // Energy penalty: if task energy > user energy, reduce priority
+            const taskEnergy = energyToNum(task.energy);
+            const userEnergyNum = energyToNum(userEnergy === "High" ? 1 : userEnergy === "Medium" ? 2 : 3);
+            if (taskEnergy > userEnergyNum) p -= 3 * (taskEnergy - userEnergyNum);
+            return p;
+        }
+
+        // --- RENDER CALENDAR ---
+        function renderCalendar() {
+            const el = document.getElementById('calendarCard');
+            el.innerHTML = calendarEvents.map(ev =>
+                `<div class="calendar-event">
+                    <span class="calendar-dot"></span>
+                    <span><b>${ev.time}</b> ${ev.title}</span>
+                </div>`
+            ).join('');
+        }
+
+        // --- RENDER TASKS ---
+        function renderTasks() {
+            // Sort by priority (desc), then by nearest deadline
+            tasks.sort((a, b) => {
+                const pa = calcPriority(a), pb = calcPriority(b);
+                if (pb !== pa) return pb - pa;
+                if (a.deadline && b.deadline)
+                    return new Date(a.deadline) - new Date(b.deadline);
+                return 0;
+            });
+            const list = document.getElementById('taskList');
+            if (tasks.length === 0) {
+                list.innerHTML = `<div style="color:#999;">No tasks yet!</div>`;
+                return;
+            }
+            list.innerHTML = '';
+            tasks.forEach((task, idx) => {
+                const urgency = getUrgency(task.deadline);
+                const catIcon = categoryIcons[task.category] || "⭐";
+                let deadlineText = "";
+                if (task.deadline) {
+                    const days = daysUntil(task.deadline);
+                    deadlineText = days < 0 ? "Overdue!" :
+                        days === 0 ? "Today" :
+                        days === 1 ? "Tomorrow" :
+                        `In ${days} days`;
+                }
+                const energyIcon = task.energy == "1" ? "🔋" : (task.energy == "2" ? "🔆" : "😴");
+                // Card
+                const card = document.createElement('div');
+                card.className = `task-card ${urgency}`;
+                card.setAttribute('draggable','true');
+                card.setAttribute('data-idx', idx);
+
+                card.innerHTML = `
+                    <div class="task-category" title="${task.category}">${catIcon}</div>
+                    <div class="task-main">
+                        <div class="task-title">${task.title}</div>
+                        <div class="task-info">
+                            <span title="Task importance">${'⭐️'.repeat(task.importance)}</span>
+                            <span style="margin-left:8px;"
+                                title="Energy needed">${energyIcon}</span>
+                            <span style="margin-left:8px;"
+                                title="Deadline">${deadlineText}</span>
+                            <span style="margin-left:8px;"
+                                title="Urgency"><b>${getUrgencyLabel(urgency)}</b></span>
+                        </div>
+                    </div>
+                    <div class="task-actions">
+                        <button title="Edit" onclick="editTask(${idx})">✏️</button>
+                        <button title="Reschedule" onclick="snoozeTask(${idx})">⏰</button>
+                        <button title="Delete" onclick="deleteTask(${idx})">🗑️</button>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+            enableDragAndDrop();
+        }
+
+        // --- FORM HANDLING ---
+        document.getElementById('taskForm').onsubmit = function(e) {
+            e.preventDefault();
+            const title = document.getElementById('taskTitle').value.trim();
+            const category = document.getElementById('taskCategory').value;
+            const importance = document.getElementById('taskImportance').value;
+            const deadline = document.getElementById('taskDeadline').value;
+            const energy = document.getElementById('taskEnergy').value;
+            if (editingTaskId !== null) {
+                Object.assign(tasks[editingTaskId], {title, category, importance, deadline, energy});
+                editingTaskId = null;
+            } else {
+                tasks.push({title, category, importance, deadline, energy});
+            }
+            this.reset();
+            renderTasks();
+        };
+
+        // --- ENERGY SELECTOR ---
+        document.querySelectorAll('.energy-btn').forEach(btn => {
+            btn.onclick = function() {
+                document.querySelectorAll('.energy-btn').forEach(b=>b.classList.remove('selected'));
+                btn.classList.add('selected');
+                userEnergy = btn.dataset.level;
+                renderTasks();
+            }
+        });
+
+        // --- TASK ACTIONS ---
+        window.deleteTask = function(idx) {
+            if (confirm("Delete this task?")) {
+                tasks.splice(idx, 1);
+                renderTasks();
+            }
+        }
+        window.editTask = function(idx) {
+            const task = tasks[idx];
+            document.getElementById('taskTitle').value = task.title;
+            document.getElementById('taskCategory').value = task.category;
+            document.getElementById('taskImportance').value = task.importance;
+            document.getElementById('taskDeadline').value = task.deadline;
+            document.getElementById('taskEnergy').value = task.energy;
+            editingTaskId = idx;
+        }
+        window.snoozeTask = function(idx) {
+            const task = tasks[idx];
+            let newDate = new Date(task.deadline);
+            newDate.setDate(newDate.getDate() + 1);
+            task.deadline = newDate.toISOString().slice(0,10);
+            renderTasks();
+        }
+
+        // --- DRAG & DROP REORDERING ---
+        function enableDragAndDrop() {
+            const cards = document.querySelectorAll('.task-card');
+            let draggingIdx = null;
+            cards.forEach(card => {
+                card.addEventListener('dragstart', function(e) {
+                    draggingIdx = Number(card.dataset.idx);
+                    card.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = "move";
+                });
+                card.addEventListener('dragend', function() {
+                    card.classList.remove('dragging');
+                });
+                card.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                });
+                card.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    const droppedIdx = Number(card.dataset.idx);
+                    if (draggingIdx !== null && droppedIdx !== draggingIdx) {
+                        // move task
+                        const tmp = tasks[draggingIdx];
+                        tasks.splice(draggingIdx,1);
+                        tasks.splice(droppedIdx,0,tmp);
+                        renderTasks();
+                    }
+                });
+            });
+        }
+
+        // --- INIT ---
+        function init() {
+            // Pre-fill today's date for easy entry
+            document.getElementById('taskDeadline').value = today;
+            renderCalendar();
+            renderTasks();
+        }
+        window.onload = init;
+    </script>
+</body>
+</html>
