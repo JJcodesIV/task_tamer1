@@ -155,7 +155,7 @@ if (saved) tasks = JSON.parse(saved);
 
 ## Contact
 
-For questions or feedback, open an issue or email [your.email@example.com].
+For questions or feedback, open an issue or email [jjivwr@gmail.com].
 
 ---
 
